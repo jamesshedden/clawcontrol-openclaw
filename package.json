@@ -1,5 +1,5 @@
 {
-  "name": "clawcontrol-openclaw",
+  "name": "clawcontrol",
   "version": "1.0.0",
   "description": "OpenClaw channel plugin for ClawControl",
   "type": "module",
