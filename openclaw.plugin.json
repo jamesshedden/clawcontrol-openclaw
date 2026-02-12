@@ -3,6 +3,12 @@
   "name": "ClawControl",
   "version": "1.0.0",
   "description": "Channel plugin connecting OpenClaw to the ClawControl desktop app",
+  "channel": {
+    "id": "clawcontrol",
+    "label": "ClawControl",
+    "selectionLabel": "ClawControl (Desktop App)",
+    "blurb": "Desktop notes app with AI chat."
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
