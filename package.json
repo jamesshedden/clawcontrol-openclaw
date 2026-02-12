@@ -9,7 +9,14 @@
     "dev": "tsc --watch"
   },
   "openclaw": {
-    "extensions": ["./index.ts"]
+    "extensions": ["./index.ts"],
+    "channel": {
+      "id": "clawcontrol",
+      "label": "ClawControl",
+      "selectionLabel": "ClawControl (Desktop App)",
+      "blurb": "Desktop notes app with AI chat.",
+      "aliases": ["cc"]
+    }
   },
   "license": "MIT"
 }
