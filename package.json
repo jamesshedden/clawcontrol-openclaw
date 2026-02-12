@@ -1,0 +1,15 @@
+{
+  "name": "clawcontrol-openclaw",
+  "version": "1.0.0",
+  "description": "OpenClaw channel plugin for ClawControl",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  },
+  "license": "MIT"
+}

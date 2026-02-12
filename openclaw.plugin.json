@@ -1,0 +1,6 @@
+{
+  "id": "clawcontrol",
+  "name": "ClawControl",
+  "version": "1.0.0",
+  "description": "Channel plugin connecting OpenClaw to the ClawControl desktop app"
+}
