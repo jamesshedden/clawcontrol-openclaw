@@ -79,6 +79,10 @@ export class ClawControlConnection {
     this.send({ type: "agent_text", id, content })
   }
 
+  sendTyping(id?: string): void {
+    this.send({ type: "agent_typing", id })
+  }
+
   sendDone(id?: string): void {
     this.send({ type: "agent_done", id })
   }

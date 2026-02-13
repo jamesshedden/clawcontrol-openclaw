@@ -14,7 +14,7 @@ export interface InboundMessage {
 
 // Messages from the plugin TO the ClawControl app (agent responses)
 export interface OutboundMessage {
-  type: "agent_text" | "agent_done" | "error" | "connected"
+  type: "agent_text" | "agent_done" | "agent_typing" | "error" | "connected"
   id?: string
   content?: string
   error?: string

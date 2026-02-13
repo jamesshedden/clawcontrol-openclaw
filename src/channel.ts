@@ -315,6 +315,9 @@ function dispatchToAgent({
     OriginatingTo: `clawcontrol:${accountId}`,
   })
 
+  // Signal to the client that we've acknowledged the message and are processing
+  connection.sendTyping(messageId)
+
   let chunkIndex = 0
 
   dispatch({
