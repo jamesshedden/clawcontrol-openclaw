@@ -11,5 +11,8 @@
   "openclaw": {
     "extensions": ["./index.ts"]
   },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
   "license": "MIT"
 }

@@ -1,3 +1,4 @@
+import WebSocket from "ws"
 import type { ClawControlConfig, InboundMessage, OutboundMessage } from "./types.js"
 
 export class ClawControlConnection {
@@ -22,33 +23,32 @@ export class ClawControlConnection {
 
     this.ws = new WebSocket(wsUrl)
 
-    this.ws.onopen = () => {
+    this.ws.on("open", () => {
       console.log("[clawcontrol] WebSocket connected")
       this._connected = true
-      // Authenticate with the shared token
       this.send({ type: "connected" })
-    }
+    })
 
-    this.ws.onmessage = (event: MessageEvent) => {
+    this.ws.on("message", (data: Buffer) => {
       try {
-        const data = JSON.parse(String(event.data)) as InboundMessage
-        if (data.type === "user_message" && data.content) {
-          this.onMessage(data)
+        const msg = JSON.parse(data.toString()) as InboundMessage
+        if (msg.type === "user_message" && msg.content) {
+          this.onMessage(msg)
         }
       } catch (err) {
         console.error("[clawcontrol] Failed to parse message:", err)
       }
-    }
+    })
 
-    this.ws.onclose = () => {
+    this.ws.on("close", () => {
       console.log("[clawcontrol] WebSocket disconnected, reconnecting...")
       this._connected = false
       this.scheduleReconnect()
-    }
+    })
 
-    this.ws.onerror = (err: Event) => {
-      console.error("[clawcontrol] WebSocket error:", err)
-    }
+    this.ws.on("error", (err: Error) => {
+      console.error("[clawcontrol] WebSocket error:", err.message)
+    })
   }
 
   disconnect(): void {
@@ -69,6 +69,10 @@ export class ClawControlConnection {
       return
     }
     this.ws.send(JSON.stringify(msg))
+  }
+
+  get connected(): boolean {
+    return this._connected
   }
 
   sendText(content: string, id?: string): void {
