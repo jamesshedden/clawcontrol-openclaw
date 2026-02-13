@@ -5,14 +5,17 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "npx tsc",
+    "dev": "npx tsc --watch"
   },
   "openclaw": {
     "extensions": ["./index.ts"]
   },
   "dependencies": {
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
   },
   "license": "MIT"
 }
