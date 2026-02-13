@@ -315,6 +315,8 @@ function dispatchToAgent({
     OriginatingTo: `clawcontrol:${accountId}`,
   })
 
+  let chunkIndex = 0
+
   dispatch({
     ctx,
     cfg,
@@ -322,8 +324,10 @@ function dispatchToAgent({
       deliver: async (payload: { text?: string }) => {
         const text = payload.text ?? ""
         if (!text) return
-        log.info?.(`[${accountId}] outbound: ${text.slice(0, 80)}`)
-        connection.sendText(text, messageId)
+        const chunkId = `${messageId}-${chunkIndex}`
+        chunkIndex++
+        log.info?.(`[${accountId}] outbound chunk ${chunkIndex}: ${text.slice(0, 80)}`)
+        connection.sendText(text, chunkId)
       },
       onError: (err: unknown) => {
         log.error?.(`[${accountId}] dispatch error: ${String(err)}`)
