@@ -327,6 +327,9 @@ function dispatchToAgent({
         connection.sendError(String(err), messageId)
       },
     },
+  }).then(() => {
+    log.info?.(`[${accountId}] dispatch complete`)
+    connection.sendDone(messageId)
   }).catch((err: unknown) => {
     log.error?.(`[${accountId}] dispatch failed: ${String(err)}`)
     connection.sendError(String(err), messageId)
