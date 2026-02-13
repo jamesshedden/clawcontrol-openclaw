@@ -236,6 +236,7 @@ export const clawcontrolPlugin = {
           dispatchToAgent({
             content: data.content,
             messageId: data.id,
+            sessionId: data.sessionId,
             noteContext: data.noteContext,
             connection,
             config,
@@ -263,6 +264,7 @@ export const clawcontrolPlugin = {
 function dispatchToAgent({
   content,
   messageId,
+  sessionId,
   noteContext,
   connection,
   config,
@@ -272,6 +274,7 @@ function dispatchToAgent({
 }: {
   content: string
   messageId: string
+  sessionId: string
   noteContext?: string
   connection: ClawControlConnection
   config: ClawControlConfig
@@ -295,7 +298,7 @@ function dispatchToAgent({
     ? `[Note context]\n${noteContext}\n\n[User message]\n${content}`
     : content
 
-  const sessionKey = `clawcontrol:${accountId}`
+  const sessionKey = `clawcontrol:${accountId}:${sessionId}`
 
   const ctx = runtime.channel.reply.finalizeInboundContext({
     Body: fullContent,

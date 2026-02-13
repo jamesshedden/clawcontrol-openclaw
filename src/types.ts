@@ -7,6 +7,7 @@ export interface ClawControlConfig {
 export interface InboundMessage {
   type: "user_message"
   id: string
+  sessionId: string
   content: string
   noteContext?: string
 }
