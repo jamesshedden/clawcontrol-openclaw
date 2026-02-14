@@ -278,8 +278,18 @@ export const clawcontrolPlugin = {
       params?: Record<string, unknown>
       accountId?: string
     }) => {
+      // Look up by accountId first, fall back to any active connection
       const connId = accountId || DEFAULT_ACCOUNT_ID
-      const connection = activeConnections.get(connId)
+      let connection = activeConnections.get(connId)
+      if (!connection || !connection.connected) {
+        // Fall back to first available connection (typically only one)
+        for (const [, conn] of activeConnections) {
+          if (conn.connected) {
+            connection = conn
+            break
+          }
+        }
+      }
       if (!connection || !connection.connected) {
         return { ok: false, error: "ClawControl not connected" }
       }
