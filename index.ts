@@ -82,6 +82,55 @@ const plugin = {
         }
       },
     })
+
+    api.registerTool({
+      name: "clawcontrol_send",
+      description:
+        "Send a proactive message to a specific thread in the ClawControl notes app. " +
+        "Use clawcontrol_threads first to find the thread ID for the file or folder you want to message. " +
+        "The message will appear in the chat panel for that file/folder, even if the user hasn't opened it yet.",
+      parameters: {
+        type: "object",
+        properties: {
+          threadId: {
+            type: "string",
+            description: "The thread ID to send to (e.g. thr_a8f3c92d)",
+          },
+          message: {
+            type: "string",
+            description: "The message content to send",
+          },
+        },
+        required: ["threadId", "message"],
+      },
+      async execute(_id: string, params: { threadId: string; message: string }) {
+        const connection = getActiveConnection()
+        if (!connection || !connection.connected) {
+          return { content: [{ type: "text", text: "ClawControl is not connected." }] }
+        }
+        try {
+          const msgId = `proactive-${Date.now()}`
+          // Send typing indicator first
+          connection.sendTyping(msgId, params.threadId)
+          // Small delay to simulate natural typing
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          // Send the message
+          connection.sendText(params.message, msgId, params.threadId)
+          // Mark done
+          connection.sendDone(msgId, params.threadId)
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Message sent to thread ${params.threadId}`,
+              },
+            ],
+          }
+        } catch (err) {
+          return { content: [{ type: "text", text: `Error: ${String(err)}` }] }
+        }
+      },
+    })
   },
 }
 
