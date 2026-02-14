@@ -4,6 +4,9 @@ import { getClawControlRuntime } from "./runtime.js"
 
 const DEFAULT_ACCOUNT_ID = "default"
 
+// Track active connections per account so handleAction can use them
+const activeConnections = new Map<string, ClawControlConnection>()
+
 export interface ClawControlAccount {
   accountId: string
   name: string
@@ -249,15 +252,62 @@ export const clawcontrolPlugin = {
       })
 
       connection.connect()
+      activeConnections.set(account.accountId, connection)
 
       // Wait for abort signal to disconnect
       return new Promise<void>((resolve) => {
         abortSignal.addEventListener("abort", () => {
           log.info?.(`[${account.accountId}] disconnecting`)
+          activeConnections.delete(account.accountId)
           connection.disconnect()
           resolve()
         })
       })
+    },
+  },
+
+  actions: {
+    listActions: () => ["thread-list", "thread-info"],
+
+    handleAction: async ({
+      action,
+      params,
+      accountId,
+    }: {
+      action: string
+      params?: Record<string, unknown>
+      accountId?: string
+    }) => {
+      const connId = accountId || DEFAULT_ACCOUNT_ID
+      const connection = activeConnections.get(connId)
+      if (!connection || !connection.connected) {
+        return { ok: false, error: "ClawControl not connected" }
+      }
+
+      switch (action) {
+        case "thread-list": {
+          try {
+            const threads = await connection.requestThreadList()
+            return { ok: true, threads }
+          } catch (err) {
+            return { ok: false, error: String(err) }
+          }
+        }
+        case "thread-info": {
+          const threadId = params?.threadId as string
+          if (!threadId) {
+            return { ok: false, error: "threadId parameter required" }
+          }
+          try {
+            const thread = await connection.requestThreadInfo(threadId)
+            return { ok: true, thread }
+          } catch (err) {
+            return { ok: false, error: String(err) }
+          }
+        }
+        default:
+          return { ok: false, error: `Unknown action: ${action}` }
+      }
     },
   },
 }
