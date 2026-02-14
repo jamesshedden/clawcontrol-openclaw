@@ -78,9 +78,14 @@ export class ClawControlConnection {
       }
     })
 
-    this.ws.on("close", () => {
-      console.log("[clawcontrol] WebSocket disconnected, reconnecting...")
+    this.ws.on("close", (code: number, reason: Buffer) => {
       this._connected = false
+      if (code === 4000) {
+        // Replaced by a newer connection — don't reconnect, this instance is stale
+        console.log("[clawcontrol] WebSocket closed (replaced by newer connection), not reconnecting")
+        return
+      }
+      console.log(`[clawcontrol] WebSocket disconnected (code: ${code}, reason: ${reason.toString()}), reconnecting...`)
       this.scheduleReconnect()
     })
 
