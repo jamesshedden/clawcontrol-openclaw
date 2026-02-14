@@ -4,8 +4,16 @@ import { getClawControlRuntime } from "./runtime.js"
 
 const DEFAULT_ACCOUNT_ID = "default"
 
-// Track active connections per account so handleAction can use them
+// Track active connections per account so tools and handleAction can use them
 const activeConnections = new Map<string, ClawControlConnection>()
+
+/** Get the first active connection (for use by agent tools) */
+export function getActiveConnection(): ClawControlConnection | undefined {
+  for (const [, conn] of activeConnections) {
+    if (conn.connected) return conn
+  }
+  return undefined
+}
 
 export interface ClawControlAccount {
   accountId: string
