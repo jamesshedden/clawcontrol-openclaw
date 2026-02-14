@@ -231,12 +231,13 @@ export const clawcontrolPlugin = {
       const connection = new ClawControlConnection(config, (data: InboundMessage) => {
         if (data.type === "user_message" && data.content) {
           log.info?.(
-            `[${account.accountId}] inbound: ${data.content.slice(0, 80)}`,
+            `[${account.accountId}] inbound: ${data.content.slice(0, 80)} (threadId: ${data.threadId})`,
           )
           dispatchToAgent({
             content: data.content,
-            messageId: data.id,
-            sessionId: data.sessionId,
+            messageId: data.id!,
+            sessionId: data.sessionId!,
+            threadId: data.threadId,
             noteContext: data.noteContext,
             connection,
             config,
@@ -265,6 +266,7 @@ function dispatchToAgent({
   content,
   messageId,
   sessionId,
+  threadId,
   noteContext,
   connection,
   config,
@@ -275,6 +277,7 @@ function dispatchToAgent({
   content: string
   messageId: string
   sessionId: string
+  threadId?: string
   noteContext?: string
   connection: ClawControlConnection
   config: ClawControlConfig
@@ -289,7 +292,7 @@ function dispatchToAgent({
     log.warn?.(
       `[${accountId}] runtime dispatch not available — message logged but not processed`,
     )
-    connection.sendError("Agent dispatch not available", messageId)
+    connection.sendError("Agent dispatch not available", messageId, threadId)
     return
   }
 
@@ -298,7 +301,8 @@ function dispatchToAgent({
     ? `[Note context]\n${noteContext}\n\n[User message]\n${content}`
     : content
 
-  const sessionKey = `clawcontrol:${accountId}:${sessionId}`
+  // Use threadId for the session key if available, falling back to sessionId
+  const sessionKey = `clawcontrol:${accountId}:${threadId || sessionId}`
 
   const ctx = runtime.channel.reply.finalizeInboundContext({
     Body: fullContent,
@@ -316,7 +320,7 @@ function dispatchToAgent({
   })
 
   // Signal to the client that we've acknowledged the message and are processing
-  connection.sendTyping(messageId)
+  connection.sendTyping(messageId, threadId)
 
   let chunkIndex = 0
 
@@ -330,18 +334,18 @@ function dispatchToAgent({
         const chunkId = `${messageId}-${chunkIndex}`
         chunkIndex++
         log.info?.(`[${accountId}] outbound chunk ${chunkIndex}: ${text.slice(0, 80)}`)
-        connection.sendText(text, chunkId)
+        connection.sendText(text, chunkId, threadId)
       },
       onError: (err: unknown) => {
         log.error?.(`[${accountId}] dispatch error: ${String(err)}`)
-        connection.sendError(String(err), messageId)
+        connection.sendError(String(err), messageId, threadId)
       },
     },
   }).then(() => {
     log.info?.(`[${accountId}] dispatch complete`)
-    connection.sendDone(messageId)
+    connection.sendDone(messageId, threadId)
   }).catch((err: unknown) => {
     log.error?.(`[${accountId}] dispatch failed: ${String(err)}`)
-    connection.sendError(String(err), messageId)
+    connection.sendError(String(err), messageId, threadId)
   })
 }
