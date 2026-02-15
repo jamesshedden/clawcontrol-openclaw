@@ -131,6 +131,45 @@ const plugin = {
         }
       },
     })
+
+    api.registerTool({
+      name: "clawcontrol_pulse",
+      description:
+        "Send a pulse notification to the user in the ClawControl notes app. " +
+        "A pulse creates a new agent-initiated chat thread that appears in the user's Pulse tab. " +
+        "Use this when you want to proactively reach out to the user about something " +
+        "(e.g. a thought, observation, suggestion, or follow-up). " +
+        "The user can reply to pulses, turning them into a conversation.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: {
+            type: "string",
+            description: "The message content to send as a pulse",
+          },
+        },
+        required: ["message"],
+      },
+      async execute(_id: string, params: { message: string }) {
+        const connection = getActiveConnection()
+        if (!connection || !connection.connected) {
+          return { content: [{ type: "text", text: "ClawControl is not connected." }] }
+        }
+        try {
+          connection.sendPulse(params.message)
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Pulse sent successfully.",
+              },
+            ],
+          }
+        } catch (err) {
+          return { content: [{ type: "text", text: `Error: ${String(err)}` }] }
+        }
+      },
+    })
   },
 }
 

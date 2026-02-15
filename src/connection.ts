@@ -134,6 +134,10 @@ export class ClawControlConnection {
     this.send({ type: "error", id, threadId, error })
   }
 
+  sendPulse(content: string): void {
+    this.send({ type: "pulse", content })
+  }
+
   // ── Request-response: query the app for fresh data ──
 
   private sendRequest(type: string, params?: Record<string, unknown>, timeoutMs = 10_000): Promise<any> {
