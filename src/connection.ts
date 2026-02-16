@@ -184,6 +184,6 @@ export class ClawControlConnection {
     const base = this.config.url.replace(/\/$/, "")
     const protocol = base.startsWith("https") ? "wss" : "ws"
     const host = base.replace(/^https?:\/\//, "")
-    return `${protocol}://${host}/ws?token=${encodeURIComponent(this.config.token)}`
+    return `${protocol}://${host}/ws/agent?token=${encodeURIComponent(this.config.token)}`
   }
 }
