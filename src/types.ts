@@ -24,10 +24,11 @@ export interface InboundMessage {
   threads?: ThreadInfo[]
 }
 
-// Messages from the plugin TO the ClawControl app (agent responses + requests)
+// Messages from the plugin TO the ClawControl server (agent responses + requests + file sync)
 export interface OutboundMessage {
   type: "agent_text" | "agent_done" | "agent_typing" | "error" | "connected"
     | "thread_list_request" | "thread_info_request" | "pulse"
+    | "file_sync" | "file_snapshot"
   id?: string
   /** Thread ID — used to target a specific thread (required for proactive messages) */
   threadId?: string
@@ -35,4 +36,9 @@ export interface OutboundMessage {
   error?: string
   /** Request ID for request-response protocol */
   requestId?: string
+  /** file_sync fields */
+  action?: "upsert" | "delete"
+  path?: string
+  /** file_snapshot fields */
+  files?: Array<{ path: string; content: string }>
 }

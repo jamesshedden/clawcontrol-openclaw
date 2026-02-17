@@ -1,5 +1,6 @@
 import type { ClawControlConfig, InboundMessage } from "./types.js"
 import { ClawControlConnection } from "./connection.js"
+import { FileSync } from "./sync.js"
 import { getClawControlRuntime } from "./runtime.js"
 
 const DEFAULT_ACCOUNT_ID = "default"
@@ -21,7 +22,8 @@ export interface ClawControlAccount {
   enabled: boolean
   url: string
   token: string
-  config: { url: string; token: string; enabled?: boolean }
+  notesPath: string
+  config: { url: string; token: string; notesPath?: string; enabled?: boolean }
 }
 
 export interface GatewayContext {
@@ -62,9 +64,11 @@ function resolveAccount(cfg: Record<string, unknown>, accountId: string): ClawCo
     enabled: source.enabled !== false,
     url: String(source.url ?? ""),
     token: String(source.token ?? ""),
+    notesPath: String(source.notesPath ?? ""),
     config: {
       url: String(source.url ?? ""),
       token: String(source.token ?? ""),
+      notesPath: source.notesPath ? String(source.notesPath) : undefined,
       enabled: source.enabled !== false,
     },
   }
@@ -239,6 +243,8 @@ export const clawcontrolPlugin = {
 
       log.info?.(`[${account.accountId}] connecting to ${account.url}`)
 
+      let fileSync: FileSync | null = null
+
       const connection = new ClawControlConnection(config, (data: InboundMessage) => {
         if (data.type === "user_message" && data.content) {
           log.info?.(
@@ -259,13 +265,47 @@ export const clawcontrolPlugin = {
         }
       })
 
+      // Set up file sync if notesPath is configured
+      if (account.notesPath) {
+        fileSync = new FileSync(
+          account.notesPath,
+          (msg) => connection.send(msg as any),
+          log,
+        )
+
+        connection.setFileSyncHandlers(
+          (msg) => fileSync!.handleServerPush(msg).catch((err) =>
+            log.error?.(`[${account.accountId}] file sync push error: ${err}`),
+          ),
+          (msg) => fileSync!.handleSnapshotAck(msg).catch((err) =>
+            log.error?.(`[${account.accountId}] file snapshot ack error: ${err}`),
+          ),
+        )
+      }
+
       connection.connect()
       activeConnections.set(account.accountId, connection)
+
+      // Start file sync after connection is established
+      if (fileSync) {
+        // Wait a tick for the WebSocket to connect before sending the snapshot
+        const startSync = () => {
+          if (connection.connected) {
+            fileSync!.start().catch((err) =>
+              log.error?.(`[${account.accountId}] file sync start error: ${err}`),
+            )
+          } else {
+            setTimeout(startSync, 500)
+          }
+        }
+        setTimeout(startSync, 1000)
+      }
 
       // Wait for abort signal to disconnect
       return new Promise<void>((resolve) => {
         abortSignal.addEventListener("abort", () => {
           log.info?.(`[${account.accountId}] disconnecting`)
+          fileSync?.stop()
           activeConnections.delete(account.accountId)
           connection.disconnect()
           resolve()

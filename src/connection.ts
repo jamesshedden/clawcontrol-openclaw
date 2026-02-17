@@ -6,6 +6,8 @@ export class ClawControlConnection {
   private config: ClawControlConfig
   private onMessage: (msg: InboundMessage) => void
   private onThreadList: ((threads: ThreadInfo[]) => void) | null = null
+  private onFileSyncPush: ((msg: any) => void) | null = null
+  private onFileSnapshotAck: ((msg: any) => void) | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private _connected = false
   private _threads: ThreadInfo[] = []
@@ -24,6 +26,15 @@ export class ClawControlConnection {
   /** Register a callback for thread list updates */
   setThreadListHandler(handler: (threads: ThreadInfo[]) => void): void {
     this.onThreadList = handler
+  }
+
+  /** Register callbacks for file sync messages from the server */
+  setFileSyncHandlers(
+    onPush: (msg: any) => void,
+    onAck: (msg: any) => void,
+  ): void {
+    this.onFileSyncPush = onPush
+    this.onFileSnapshotAck = onAck
   }
 
   /** Get the latest thread list */
@@ -70,6 +81,10 @@ export class ClawControlConnection {
           this._threads = msg.threads
           console.log(`[clawcontrol] received thread_list: ${msg.threads.length} threads`)
           this.onThreadList?.(msg.threads)
+        } else if (msg.type === "file_sync_push") {
+          this.onFileSyncPush?.(msg)
+        } else if (msg.type === "file_snapshot_ack") {
+          this.onFileSnapshotAck?.(msg)
         } else if (msg.type === "user_message" && msg.content) {
           this.onMessage(msg as InboundMessage)
         }
