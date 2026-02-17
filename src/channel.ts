@@ -8,6 +8,9 @@ const DEFAULT_ACCOUNT_ID = "default"
 // Track active connections per account so tools and handleAction can use them
 const activeConnections = new Map<string, ClawControlConnection>()
 
+// Track active sessions so outbound.sendText can route to the right thread
+const activeSessions = new Map<string, { connection: ClawControlConnection; threadId?: string }>()
+
 /** Get the first active connection (for use by agent tools) */
 export function getActiveConnection(): ClawControlConnection | undefined {
   for (const [, conn] of activeConnections) {
@@ -170,10 +173,13 @@ export const clawcontrolPlugin = {
     },
     chunkerMode: "text",
     textChunkLimit: 8000,
+    resolveTarget: ({ to }: { to?: string }) => {
+      // Accept any target — we route based on active sessions
+      return { ok: true as const, to: to || "user" }
+    },
     sendText: async ({
       text,
-      accountId,
-      deps,
+      accountId: acctId,
     }: {
       to: string
       text: string
@@ -182,11 +188,24 @@ export const clawcontrolPlugin = {
       replyToId?: string
       threadId?: string
     }) => {
-      // This is the fallback sendText (used when no live connection is available).
-      // In practice, responses go through the dispatch deliver callback below.
-      const cfg = deps?.cfg as Record<string, unknown> | undefined
-      if (!cfg) return { channel: "clawcontrol", ok: false, error: "no config" }
-      console.log(`[clawcontrol] outbound.sendText fallback: ${text.slice(0, 80)}`)
+      const connId = acctId || DEFAULT_ACCOUNT_ID
+      const connection = activeConnections.get(connId)
+      if (!connection || !connection.connected) {
+        return { channel: "clawcontrol", ok: false, error: "Not connected" }
+      }
+
+      // Find the most recent session for this account to get the threadId
+      let targetThread: string | undefined
+      for (const [key, session] of activeSessions) {
+        if (key.startsWith(`clawcontrol:${connId}:`) && session.connection === connection) {
+          targetThread = session.threadId
+        }
+      }
+
+      const msgId = `outbound-${Date.now()}`
+      connection.sendText(text, msgId, targetThread)
+      connection.sendDone(msgId, targetThread)
+
       return { channel: "clawcontrol", ok: true }
     },
   },
@@ -412,6 +431,9 @@ function dispatchToAgent({
   // Use threadId for the session key if available, falling back to sessionId
   const sessionKey = `clawcontrol:${accountId}:${threadId || sessionId}`
 
+  // Track session so outbound.sendText can route to the right thread
+  activeSessions.set(sessionKey, { connection, threadId })
+
   const ctx = runtime.channel.reply.finalizeInboundContext({
     Body: fullContent,
     From: "clawcontrol:user",
@@ -427,28 +449,29 @@ function dispatchToAgent({
     OriginatingTo: `clawcontrol:${accountId}`,
   })
 
-  // Signal to the client that we've acknowledged the message and are processing
-  connection.sendTyping(messageId, threadId)
-
   let chunkIndex = 0
 
   dispatch({
     ctx,
     cfg,
     dispatcherOptions: {
-      deliver: async (payload: { text?: string }) => {
+      deliver: async (payload: { text?: string }, info?: { kind?: string }) => {
         const text = payload.text ?? ""
         if (!text) return
         const chunkId = `${messageId}-${chunkIndex}`
         chunkIndex++
-        log.info?.(`[${accountId}] outbound chunk ${chunkIndex}: ${text.slice(0, 80)}`)
+        log.info?.(`[${accountId}] outbound ${info?.kind ?? "chunk"} ${chunkIndex}: ${text.slice(0, 80)}`)
         connection.sendText(text, chunkId, threadId)
+      },
+      onReplyStart: () => {
+        connection.sendTyping(messageId, threadId)
       },
       onError: (err: unknown) => {
         log.error?.(`[${accountId}] dispatch error: ${String(err)}`)
         connection.sendError(String(err), messageId, threadId)
       },
     },
+    replyOptions: {},
   }).then(() => {
     log.info?.(`[${accountId}] dispatch complete`)
     connection.sendDone(messageId, threadId)
