@@ -3,6 +3,13 @@ export interface ClawControlConfig {
   token: string
 }
 
+export interface AttachmentInfo {
+  id: string
+  filename: string
+  mimeType: string
+  url: string  // relative URL: /attachments/<id>
+}
+
 // Thread metadata sent from the app
 export interface ThreadInfo {
   id: string
@@ -20,8 +27,14 @@ export interface InboundMessage {
   threadId?: string
   content?: string
   noteContext?: string
+  /** Human-readable label for the thread (path or title) */
+  threadLabel?: string
+  /** Thread type: file, folder, chat, pulse */
+  threadType?: string
+  /** Image attachments sent with the message */
+  attachments?: AttachmentInfo[]
   /** Conversation history for context (most recent messages, chronological order) */
-  history?: Array<{ role: "user" | "assistant"; content: string }>
+  history?: Array<{ role: "user" | "assistant"; content: string; timestamp?: number }>
   /** Thread list (when type is "thread_list") */
   threads?: ThreadInfo[]
 }

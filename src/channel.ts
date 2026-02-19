@@ -1,7 +1,10 @@
-import type { ClawControlConfig, InboundMessage } from "./types.js"
+import type { ClawControlConfig, InboundMessage, AttachmentInfo } from "./types.js"
 import { ClawControlConnection } from "./connection.js"
 import { FileSync } from "./sync.js"
 import { getClawControlRuntime } from "./runtime.js"
+import fs from "node:fs"
+import path from "node:path"
+import os from "node:os"
 
 const DEFAULT_ACCOUNT_ID = "default"
 
@@ -275,13 +278,18 @@ export const clawcontrolPlugin = {
             sessionId: data.sessionId!,
             threadId: data.threadId,
             noteContext: data.noteContext,
+            threadLabel: data.threadLabel,
+            threadType: data.threadType,
+            attachments: data.attachments,
             history: data.history,
             connection,
             config,
             cfg,
             log,
             accountId: account.accountId,
-          })
+          }).catch((err) =>
+            log.error?.(`[${account.accountId}] dispatchToAgent error: ${String(err)}`),
+          )
         }
       })
 
@@ -390,12 +398,46 @@ export const clawcontrolPlugin = {
   },
 }
 
-function dispatchToAgent({
+async function downloadAttachments(
+  attachments: AttachmentInfo[],
+  config: ClawControlConfig,
+  log: GatewayContext["log"],
+): Promise<string[]> {
+  const mediaDir = path.join(os.tmpdir(), "clawcontrol-media")
+  fs.mkdirSync(mediaDir, { recursive: true })
+
+  const localPaths: string[] = []
+
+  for (const att of attachments) {
+    try {
+      const url = `${config.url.replace(/\/$/, "")}${att.url}?token=${encodeURIComponent(config.token)}`
+      const res = await fetch(url)
+      if (!res.ok) {
+        log.warn?.(`Failed to download attachment ${att.id}: HTTP ${res.status}`)
+        continue
+      }
+      const ext = att.filename.split(".").pop() || "bin"
+      const localPath = path.join(mediaDir, `${att.id}.${ext}`)
+      const buffer = Buffer.from(await res.arrayBuffer())
+      fs.writeFileSync(localPath, buffer)
+      localPaths.push(localPath)
+    } catch (err) {
+      log.warn?.(`Failed to download attachment ${att.id}: ${String(err)}`)
+    }
+  }
+
+  return localPaths
+}
+
+async function dispatchToAgent({
   content,
   messageId,
   sessionId,
   threadId,
   noteContext,
+  threadLabel,
+  threadType,
+  attachments,
   history,
   connection,
   config,
@@ -408,7 +450,10 @@ function dispatchToAgent({
   sessionId: string
   threadId?: string
   noteContext?: string
-  history?: Array<{ role: "user" | "assistant"; content: string }>
+  threadLabel?: string
+  threadType?: string
+  attachments?: AttachmentInfo[]
+  history?: Array<{ role: "user" | "assistant"; content: string; timestamp?: number }>
   connection: ClawControlConnection
   config: ClawControlConfig
   cfg: Record<string, unknown>
@@ -435,7 +480,7 @@ function dispatchToAgent({
   const inboundHistory = history?.map((m) => ({
     sender: m.role === "user" ? "user" : "agent",
     body: m.content,
-    timestamp: Date.now(),
+    timestamp: m.timestamp || Date.now(),
   }))
 
   // Use threadId for the session key if available, falling back to sessionId
@@ -443,6 +488,34 @@ function dispatchToAgent({
 
   // Track session so outbound.sendText can route to the right thread
   activeSessions.set(sessionKey, { connection, threadId })
+
+  // Download attachments if present
+  let mediaFields: Record<string, unknown> = {}
+  if (attachments && attachments.length > 0) {
+    const localPaths = await downloadAttachments(attachments, config, log)
+    if (localPaths.length > 0) {
+      const mimeTypes = attachments
+        .filter((_, i) => i < localPaths.length)
+        .map((a) => a.mimeType)
+      const urls = attachments
+        .filter((_, i) => i < localPaths.length)
+        .map((a) => `${config.url.replace(/\/$/, "")}${a.url}`)
+
+      if (localPaths.length === 1) {
+        mediaFields = {
+          MediaPath: localPaths[0],
+          MediaUrl: urls[0],
+          MediaType: mimeTypes[0],
+        }
+      } else {
+        mediaFields = {
+          MediaPaths: localPaths,
+          MediaUrls: urls,
+          MediaTypes: mimeTypes,
+        }
+      }
+    }
+  }
 
   const ctx = runtime.channel.reply.finalizeInboundContext({
     Body: fullContent,
@@ -459,6 +532,9 @@ function dispatchToAgent({
     CommandAuthorized: true,
     OriginatingChannel: "clawcontrol",
     OriginatingTo: `clawcontrol:${accountId}`,
+    ...(threadLabel ? { ConversationLabel: threadLabel, ThreadLabel: threadLabel } : {}),
+    ...(threadType ? { ThreadType: threadType } : {}),
+    ...mediaFields,
   })
 
   let chunkIndex = 0
