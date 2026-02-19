@@ -275,6 +275,7 @@ export const clawcontrolPlugin = {
             sessionId: data.sessionId!,
             threadId: data.threadId,
             noteContext: data.noteContext,
+            history: data.history,
             connection,
             config,
             cfg,
@@ -395,6 +396,7 @@ function dispatchToAgent({
   sessionId,
   threadId,
   noteContext,
+  history,
   connection,
   config,
   cfg,
@@ -406,6 +408,7 @@ function dispatchToAgent({
   sessionId: string
   threadId?: string
   noteContext?: string
+  history?: Array<{ role: "user" | "assistant"; content: string }>
   connection: ClawControlConnection
   config: ClawControlConfig
   cfg: Record<string, unknown>
@@ -428,6 +431,13 @@ function dispatchToAgent({
     ? `[Note context]\n${noteContext}\n\n[User message]\n${content}`
     : content
 
+  // Build structured conversation history for the framework
+  const inboundHistory = history?.map((m) => ({
+    sender: m.role === "user" ? "user" : "agent",
+    body: m.content,
+    timestamp: Date.now(),
+  }))
+
   // Use threadId for the session key if available, falling back to sessionId
   const sessionKey = `clawcontrol:${accountId}:${threadId || sessionId}`
 
@@ -436,6 +446,8 @@ function dispatchToAgent({
 
   const ctx = runtime.channel.reply.finalizeInboundContext({
     Body: fullContent,
+    BodyForAgent: content,
+    InboundHistory: inboundHistory,
     From: "clawcontrol:user",
     To: `clawcontrol:${accountId}`,
     SessionKey: sessionKey,

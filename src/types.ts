@@ -20,6 +20,8 @@ export interface InboundMessage {
   threadId?: string
   content?: string
   noteContext?: string
+  /** Conversation history for context (most recent messages, chronological order) */
+  history?: Array<{ role: "user" | "assistant"; content: string }>
   /** Thread list (when type is "thread_list") */
   threads?: ThreadInfo[]
 }
